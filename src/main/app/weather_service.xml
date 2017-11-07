@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:ws="http://www.mulesoft.org/schema/mule/ws" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
-http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd">
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.mulesoft.org/schema/mule/ws http://www.mulesoft.org/schema/mule/ws/current/mule-ws.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
     <http:listener-config name="weather_service-httpListenerConfig" host="0.0.0.0" port="8081" basePath="/globalweather" doc:name="HTTP Listener Configuration"/>
-    <apikit:config name="weather_service-config" raml="weather_service.raml" consoleEnabled="false" doc:name="Router"/>
+    <apikit:config name="weather_service-config" raml="weather_service.raml" consoleEnabled="false" doc:name="Router" keepRamlBaseUri="false"/>
+    <ws:consumer-config name="Web_Service_Consumer" wsdlLocation="weather_service.wsdl" service="GlobalWeather" port="GlobalWeatherSoap" serviceAddress="http://www.webservicex.com/globalweather.asmx" doc:name="Web Service Consumer"/>
     <flow name="weather_service-main">
         <http:listener config-ref="weather_service-httpListenerConfig" path="/*" doc:name="HTTP"/>
         <apikit:router config-ref="weather_service-config" doc:name="APIkit Router"/>
@@ -14,8 +20,58 @@ http://www.springframework.org/schema/beans http://www.springframework.org/schem
         <http:listener config-ref="weather_service-httpListenerConfig" path="/console/*" doc:name="HTTP"/>
         <apikit:console config-ref="weather_service-config" doc:name="APIkit Console"/>
     </flow>
+    <flow name="Flow-&lt;Transform-City-XML-To-JSON&gt;">
+        <dw:transform-message doc:name="Transform City XML Data to JSON Data" metadata:id="7b7ea072-9e96-43fd-9b49-a33485165f6c">
+            <dw:input-payload mimeType="application/xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{  
+	cities: payload.NewDataSet map ({
+              City: $.City,
+              Country: $.Country
+          })
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <flow name="Flow-&lt;GetCityData&gt;">
+        <dw:transform-message doc:name="Get City Data in XML Format">
+            <dw:input-payload doc:sample="sample_data\GetCitiesByCountryResponse.xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%namespace ns0 http://www.webserviceX.NET
+---
+trim payload.GetCitiesByCountryResponse.ns0#GetCitiesByCountryResult
+]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+    <sub-flow name="Flow-&lt;Setup_Soap_Request&gt;-&lt;Get_Cities_By_Country&gt;">
+        <dw:transform-message doc:name="Setup Soap Request" metadata:id="e2e59ef5-b809-4466-82fb-3605c4e4d5a5">
+            <dw:input-payload doc:sample="sample_data\string.dwl" mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml encoding="UTF-8"
+%namespace soap http://schemas.xmlsoap.org/soap/envelope/
+%namespace web http://www.webserviceX.NET
+---
+ {   
+    web#GetCitiesByCountry: {web#CountryName: payload}
+ }]]></dw:set-payload>
+        </dw:transform-message>
+    </sub-flow>
+    <flow name="Flow-&lt;Setup-Load&gt;-&lt;Get-Cities-By-Country&gt;">
+        <set-payload value="#[message.inboundProperties.'http.query.params'.countryName]" mimeType="application/java" doc:name="Set Payload"/>
+    </flow>
+
     <flow name="get:/city:weather_service-config">
-        <set-payload value="[&#xA;  {&#xA;    &quot;country&quot;: &quot;Australia&quot;,&#xA;    &quot;city&quot;: &quot;Cairns Airport&quot;&#xA;  },&#xA;  {&#xA;    &quot;country&quot;: &quot;Australia&quot;,&#xA;    &quot;city&quot;: &quot;Gladstone&quot;&#xA;  }&#xA;]" doc:name="Set Payload"/>
+        <flow-ref name="Flow-&lt;Setup-Load&gt;-&lt;Get-Cities-By-Country&gt;" doc:name="Flow-Reference-&lt;Setup-Load&gt;-&lt;Get-Cities-By-Country&gt;"/>
+        <flow-ref name="Flow-&lt;Setup_Soap_Request&gt;-&lt;Get_Cities_By_Country&gt;" doc:name="Flow-&lt;Setup_Soap_Request&gt;-&lt;Get_Cities_By_Country&gt;"/>
+        <ws:consumer config-ref="Web_Service_Consumer" operation="GetCitiesByCountry" doc:name="Weather Service Consumer"/>
+
+        <logger message="after web service: #[message.payload]" level="INFO" doc:name="Logger"/>
+        <flow-ref name="Flow-&lt;GetCityData&gt;" doc:name="Flow-&lt;GetCityData&gt;"/>
+        <flow-ref name="Flow-&lt;Transform-City-XML-To-JSON&gt;" doc:name="Flow-Reference&lt;Transform-City-XML-To-JSON&gt;"/>
+
+        <logger message="Response Logger #[message.payload]" level="INFO" doc:name="Response Logger"/>
     </flow>
     <flow name="get:/weather:weather_service-config">
         <set-payload value="{&#xA;  &quot;location&quot;: &quot;Melbourne&quot;,&#xA;  &quot;time&quot;: &quot;11 AM&quot;,&#xA;  &quot;wind&quot;: &quot;15 km per hour&quot;,&#xA;  &quot;visibility&quot;: &quot;10 km&quot;,&#xA;  &quot;skyConditions&quot;: &quot;sunny&quot;,&#xA;  &quot;temperature&quot;: &quot;18&quot;,&#xA;  &quot;dewPoint&quot;: &quot;2 C&quot;,&#xA;  &quot;relativeHumidity&quot;: &quot;35&quot;,&#xA;  &quot;status&quot;: &quot;Normal&quot;&#xA;}" doc:name="Set Payload"/>
