@@ -1,0 +1,64 @@
+#%RAML 0.8
+title: Weather Service
+version: 1.0.development
+baseUri: http://0.0.0.0:8081/globalweather
+
+/weather:
+  displayName: Weather
+  get:
+    description: Get weather report for all major cities around the world 
+    queryParameters:
+      countryName:
+        description: the name of a country
+        pattern: ^$|[a-zA-Z0-9\-\s^~`!@#$%^&*()_+={}\[\]|\\;:"',.<>?/]+
+        required: true
+        example: "Australia"
+      cityName:
+        description: the name of a city
+        pattern: ^$|[a-zA-Z0-9\-\s^~`!@#$%^&*()_+={}\[\]|\\;:"',.<>?/]+
+        required: true
+        example: "Melbourne"             
+    responses:
+      200:
+        body:
+          application/json:
+            example: |
+                {
+                  "location": "Melbourne",
+                  "time": "11 AM",
+                  "wind": "15 km per hour",
+                  "visibility": "10 km",
+                  "skyConditions": "sunny",
+                  "temperature": "18",
+                  "dewPoint": "2 C",
+                  "relativeHumidity": "35",
+                  "status": "Normal"
+                }
+                  
+/city:
+  displayName: Cities
+  get:
+    description: Get all major cities by country name
+    queryParameters:
+      countryName:
+        description: the name of a country.
+        pattern: ^$|[a-zA-Z0-9\-\s^~`!@#$%^&*()_+={}\[\]|\\;:"',.<>?/]+
+        required: false
+        example: "Australia"    
+    responses:
+      200:
+        body:
+          application/json:
+            example: |
+              [
+                {
+                  "country": "Australia",
+                  "city": "Cairns Airport"
+                },
+                {
+                  "country": "Australia",
+                  "city": "Gladstone"
+                }
+              ]  
+
+           
