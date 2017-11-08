@@ -20,6 +20,23 @@ http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/m
         <http:listener config-ref="weather_service-httpListenerConfig" path="/console/*" doc:name="HTTP"/>
         <apikit:console config-ref="weather_service-config" doc:name="APIkit Console"/>
     </flow>
+    <flow name="Flow_Weather_Data_Check">
+        <choice doc:name="Choice- Check Weather Data Available">
+            <when expression="#[payload == 'Data Not Found']">
+                <logger message="logger: #[payload]" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="Transform Weather Data from XML to JSON">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{  
+	weather: payload.NewDataSet
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+    </flow>
     <flow name="Flow-&lt;Transform-City-XML-To-JSON&gt;">
         <dw:transform-message doc:name="Transform City XML Data to JSON Data" metadata:id="7b7ea072-9e96-43fd-9b49-a33485165f6c">
             <dw:input-payload mimeType="application/xml"/>
@@ -74,7 +91,40 @@ trim payload.GetCitiesByCountryResponse.ns0#GetCitiesByCountryResult
         <logger message="Response Logger #[message.payload]" level="INFO" doc:name="Response Logger"/>
     </flow>
     <flow name="get:/weather:weather_service-config">
-        <set-payload value="{&#xA;  &quot;location&quot;: &quot;Melbourne&quot;,&#xA;  &quot;time&quot;: &quot;11 AM&quot;,&#xA;  &quot;wind&quot;: &quot;15 km per hour&quot;,&#xA;  &quot;visibility&quot;: &quot;10 km&quot;,&#xA;  &quot;skyConditions&quot;: &quot;sunny&quot;,&#xA;  &quot;temperature&quot;: &quot;18&quot;,&#xA;  &quot;dewPoint&quot;: &quot;2 C&quot;,&#xA;  &quot;relativeHumidity&quot;: &quot;35&quot;,&#xA;  &quot;status&quot;: &quot;Normal&quot;&#xA;}" doc:name="Set Payload"/>
+        <set-payload value="{
+  &quot;cityName&quot;: &quot;#[message.inboundProperties.'http.query.params'.cityName]&quot;,
+  &quot;countryName&quot;: &quot;#[message.inboundProperties.'http.query.params'.countryName]&quot;
+}" doc:name="Set Payload" mimeType="application/json"/>
+        <logger message="message: #[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Setup Soap Request &lt;weather&gt;">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml encoding="UTF-8"
+%namespace soap http://schemas.xmlsoap.org/soap/envelope/
+%namespace web http://www.webserviceX.NET
+---
+ {   
+    web#GetWeather: {
+    	web#CityName: payload.cityName,
+    	web#CountryName: payload.countryName
+    }
+ }
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="message: #[payload]" level="INFO" doc:name="Logger"/>
+        <ws:consumer config-ref="Web_Service_Consumer" operation="GetWeather" doc:name="Weather Service Consumer"/>
+        <logger message="message: #[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Extract Weather Info">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%namespace ns0 http://www.webserviceX.NET
+---
+trim payload.GetWeatherResponse.ns0#GetWeatherResult
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="message:  #[payload]" level="INFO" doc:name="Logger"/>
+        <flow-ref name="Flow_Weather_Data_Check" doc:name="Flow_Weather_Data_Check"/>
+
+
     </flow>
     <apikit:mapping-exception-strategy name="weather_service-apiKitGlobalExceptionMapping">
         <apikit:mapping statusCode="404">

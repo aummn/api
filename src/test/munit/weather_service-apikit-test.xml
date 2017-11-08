@@ -8,7 +8,7 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
         <spring:import resource="classpath:weather_service.xml"/>
     </spring:beans>
     <munit:config mock-connectors="false" mock-inbounds="false" doc:name="MUnit configuration"/>
-    <http:request-config name="HTTP_Request_Configuration" host="localhost" port="8081" basePath="/api" doc:name="HTTP Request Configuration"/>
+    <http:request-config name="HTTP_Request_Configuration" host="localhost" port="8081" basePath="/globalweather" doc:name="HTTP Request Configuration"/>
     <munit:test name="get:/city:weather_service-config-200-application/json-FlowTest" description="Verifying functionality of [get:/city:weather_service-config-200-application/json]">
         <http:request config-ref="HTTP_Request_Configuration" path="/city" method="GET" doc:name="HTTP">
             <http:request-builder>
@@ -17,10 +17,9 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
         </http:request>
         <object-to-string-transformer doc:name="http response to string"/>
         <munit:assert-true message="The HTTP Status code is not correct!" condition="#[messageInboundProperty('http.status').is(eq(200))]" doc:name="assert that - http.status eq 200"/>
-        <munit:assert-on-equals message="The response payload is not correct!" expectedValue="#[getResource('scaffolder/response/get_200_city_application_json.json').asString()]" actualValue="#[payload]" doc:name="assert that - payload is as expected"/>
     </munit:test>
     <munit:test name="get:/weather:weather_service-config-200-application/json-FlowTest" description="Verifying functionality of [get:/weather:weather_service-config-200-application/json]">
-        <set-variable variableName="cityName" value="#['Melbourne']" doc:name="cityName"/>
+        <set-variable variableName="cityName" value="#['Brisbane']" doc:name="cityName"/>
         <set-variable variableName="countryName" value="#['Australia']" doc:name="countryName"/>
         <http:request config-ref="HTTP_Request_Configuration" path="/weather" method="GET" doc:name="HTTP">
             <http:request-builder>
@@ -31,7 +30,7 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
         </http:request>
         <object-to-string-transformer doc:name="http response to string"/>
         <munit:assert-true message="The HTTP Status code is not correct!" condition="#[messageInboundProperty('http.status').is(eq(200))]" doc:name="assert that - http.status eq 200"/>
-        <munit:assert-on-equals message="The response payload is not correct!" expectedValue="#[getResource('scaffolder/response/get_200_weather_application_json.json').asString()]" actualValue="#[payload]" doc:name="assert that - payload is as expected"/>
+        <munit:assert-on-equals message="The response payload is not correct!" expectedValue="&quot;Data Not Found&quot;" actualValue="#[payload]" doc:name="assert that - payload is as expected"/>
     </munit:test>
     <munit:test name="weather_service-unit-test-Flow-&lt;Setup-Load&gt;-&lt;Get-Cities-By-Country&gt;Test" description="Test">
         <munit:set payload="#[]" doc:name="Set Message">
@@ -61,7 +60,7 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
         <flow-ref name="Flow-&lt;Transform-City-XML-To-JSON&gt;" doc:name="Flow-ref to Flow-&lt;Transform-City-XML-To-JSON&gt;"/>
         <object-to-string-transformer doc:name="Object to String"/>
         <logger message="logger final: #[message.payload]" level="INFO" doc:name="Logger"/>
-        <munit:assert-on-equals message="Payload is not right" expectedValue="#[getResource('scaffolder/response/Transform-City-XML-To-Java.json').asString().replaceAll(&quot;[\r|\n]&quot;, &quot;&quot;)]" actualValue="#[payload.replaceAll(&quot;[\r|\n]&quot;, &quot;&quot;)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="Payload is not right" expectedValue="#[getResource('scaffolder/response/Transform-City-XML-To-JSON.json').asString().replaceAll(&quot;[\r|\n]&quot;, &quot;&quot;)]" actualValue="#[payload.replaceAll(&quot;[\r|\n]&quot;, &quot;&quot;)]" doc:name="Assert Equals"/>
     </munit:test>
     <munit:test name="weather_service-function-test-get:/city:weather_service-configTest1" description="Test">
         <munit:set payload="#[]" doc:name="Set Message">
@@ -71,7 +70,29 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
         </munit:set>
         <flow-ref name="get:/city:weather_service-config" doc:name="Flow-ref to get:/city:weather_service-config"/>
         <object-to-string-transformer doc:name="Object to String"/>
-        <munit:assert-true message="The HTTP Status code is not correct!" condition="#[messageInboundProperty('http.status').is(eq(200))]" doc:name="assert that - http.status eq 200"/>
-        <munit:assert-on-equals message="Payload is not right" expectedValue="#[getResource('scaffolder/response/Transform-City-XML-To-Java.json').asString().replaceAll(&quot;[\r|\n]&quot;, &quot;&quot;)]" actualValue="#[payload.replaceAll(&quot;[\r|\n]&quot;, &quot;&quot;)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="Payload is not right" expectedValue="#[getResource('scaffolder/response/Transform-City-XML-To-JSON.json').asString().replaceAll(&quot;[\r|\n]&quot;, &quot;&quot;)]" actualValue="#[payload.replaceAll(&quot;[\r|\n]&quot;, &quot;&quot;)]" doc:name="Assert Equals"/>
+    </munit:test>
+    <munit:test name="weather_service-unit-test-one-Flow_Weather_Data_CheckTest" description="Test">
+        <set-payload value="&lt;NewDataSet&gt;     &lt;Location&gt;Melbourne&lt;/Location&gt;     &lt;Time&gt;11 AM&lt;/Time&gt;     &lt;Wind&gt;15 km per hour&lt;/Wind&gt;     &lt;Visibility&gt;10 km&lt;/Visibility&gt;     &lt;SkyConditions&gt;sunny&lt;/SkyConditions&gt;     &lt;Temperature&gt;18&lt;/Temperature&gt;     &lt;DewPoint&gt;2 C&lt;/DewPoint&gt;     &lt;RelativeHumidity&gt;35&lt;/RelativeHumidity&gt;     &lt;Status&gt;Normal&lt;/Status&gt; &lt;/NewDataSet&gt;" mimeType="application/xml" doc:name="Set Payload"/>
+        <flow-ref name="Flow_Weather_Data_Check" doc:name="Flow-ref to Flow_Weather_Data_Check"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <munit:assert-on-equals message="Payload is not right" expectedValue="#[getResource('scaffolder/response/Transform-Weather-XML-To-JSON.json').asString().replaceAll(&quot;[\r|\n]&quot;, &quot;&quot;)]" actualValue="#[payload.replaceAll(&quot;[\r|\n]&quot;, &quot;&quot;)]" doc:name="Assert Equals"/>
+    </munit:test>
+    <munit:test name="weather_service-unit-test-two-Flow_Weather_Data_CheckTest" description="Test">
+        <set-payload value="#['Data Not Found']" doc:name="Set Payload"/>
+        <flow-ref name="Flow_Weather_Data_Check" doc:name="Flow-ref to Flow_Weather_Data_Check"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <munit:assert-on-equals message="payload is not right" expectedValue="#['Data Not Found']" actualValue="#[payload]" doc:name="Assert Equals"/>
+    </munit:test>
+    <munit:test name="weather_service-function-test-get:/weather:weather_service-configTest" description="Test">
+        <munit:set payload="#[]" doc:name="Set Message">
+            <munit:inbound-properties>
+                <munit:inbound-property key="http.query.params" value="#[['countryName':'Australia']]"/>
+                <munit:inbound-property key="http.query.params" value="#[['cityName':'Brisbane']]"/>
+            </munit:inbound-properties>
+        </munit:set>
+        <flow-ref name="get:/weather:weather_service-config" doc:name="Flow-ref to get:/weather:weather_service-config"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <munit:assert-on-equals message="Payload is not right" expectedValue="#['Data Not Found']" actualValue="#[payload]" doc:name="Assert Equals"/>
     </munit:test>
 </mule>
